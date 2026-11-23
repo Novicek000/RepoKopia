@@ -32,31 +32,79 @@ public class AppUpdates extends JobService {
         }
         return 0;
     }
-    static void check(Context c) throws Exception {
-        HttpURLConnection h=(HttpURLConnection)new URL("https://api.github.com/repos/"+REPO+"/releases/latest").openConnection();
-        h.setConnectTimeout(15000);h.setReadTimeout(20000);
+    private static final String VERSION_PATTERN="v?[0-9]+(\\.[0-9]+){0,3}";
+
+    static HttpURLConnection connection(String url) throws IOException {
+        HttpURLConnection h=(HttpURLConnection)new URL(url).openConnection();
+        h.setConnectTimeout(15000);
+        h.setReadTimeout(20000);
+        h.setRequestProperty("User-Agent","RepoKopia Android (https://github.com/"+REPO+")");
+        return h;
+    }
+
+    static final class Release {
+        final String tag,asset;
+        Release(String tag,String asset){this.tag=tag;this.asset=asset;}
+    }
+
+    private static boolean newer(String tag,String installed) throws IOException {
+        if(!tag.matches(VERSION_PATTERN))throw new IOException("Nieznany format wersji: "+tag);
+        return compare(tag,installed)>0;
+    }
+
+    private static Release publicRelease(String installed) throws IOException {
+        HttpURLConnection page=connection(RELEASES+"latest");
+        String tag;
+        try{
+            page.setInstanceFollowRedirects(false);
+            page.setRequestMethod("HEAD");
+            int code=page.getResponseCode();
+            if(code==404)return new Release("","");
+            String location=page.getHeaderField("Location");
+            if(code<300 || code>=400 || location==null)
+                throw new IOException("Nie udało się odczytać strony najnowszego wydania (HTTP "+code+").");
+            String target=new URL(page.getURL(),location).toString();
+            if(target.equals(RELEASES.substring(0,RELEASES.length()-1)))return new Release("","");
+            if(!target.startsWith(RELEASES+"tag/"))throw new IOException("Nieznany adres wydania GitHub.");
+            tag=target.substring((RELEASES+"tag/").length());
+        }finally{page.disconnect();}
+        if(!newer(tag,installed))return new Release(tag,"");
+        String url=RELEASES+"download/"+tag+"/RepoKopia-"+tag.replaceFirst("^v","")+".apk";
+        HttpURLConnection apk=connection(url);
+        try{
+            apk.setRequestMethod("HEAD");
+            int code=apk.getResponseCode();
+            if(code!=200)throw new IOException("Nie udało się potwierdzić pliku APK dla "+tag+" (HTTP "+code+").");
+        }finally{apk.disconnect();}
+        return new Release(tag,url);
+    }
+
+    static Release latest(String installed) throws Exception {
+        HttpURLConnection h=connection("https://api.github.com/repos/"+REPO+"/releases/latest");
         h.setRequestProperty("Accept","application/vnd.github+json");
-        String tag="",asset="";
         try{
             int code=h.getResponseCode();
-            if(code!=404){
-                if(code!=200)throw new IOException("GitHub zwrócił HTTP "+code);
-                ByteArrayOutputStream bytes=new ByteArrayOutputStream();
-                try(InputStream in=h.getInputStream()){Reports.copy(in,bytes);}
-                JSONObject release=new JSONObject(bytes.toString("UTF-8"));
-                tag=release.getString("tag_name");
-                if(!tag.matches("v?[0-9]+(\\.[0-9]+){0,3}"))throw new IOException("Nieznany format wersji: "+tag);
-                String installed=c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionName;
-                if(compare(tag,installed)>0){
-                    JSONArray assets=release.getJSONArray("assets");
-                    for(int i=0;i<assets.length();i++){
-                        String url=assets.getJSONObject(i).optString("browser_download_url");
-                        if(url.startsWith(RELEASES+"download/"+tag+"/") && url.endsWith(".apk")){asset=url;break;}
-                    }
-                    if(asset.isEmpty())throw new IOException("W wydaniu "+tag+" brakuje APK.");
-                }
+            if(code==403 || code==429)return publicRelease(installed);
+            if(code==404)return new Release("","");
+            if(code!=200)throw new IOException("GitHub zwrócił HTTP "+code);
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+            try(InputStream in=h.getInputStream()){Reports.copy(in,bytes);}
+            JSONObject release=new JSONObject(bytes.toString("UTF-8"));
+            String tag=release.getString("tag_name");
+            if(!newer(tag,installed))return new Release(tag,"");
+            JSONArray assets=release.getJSONArray("assets");
+            for(int i=0;i<assets.length();i++){
+                String url=assets.getJSONObject(i).optString("browser_download_url");
+                if(url.startsWith(RELEASES+"download/"+tag+"/") && url.endsWith(".apk"))return new Release(tag,url);
             }
+            throw new IOException("W wydaniu "+tag+" brakuje APK.");
         }finally{h.disconnect();}
+    }
+
+    static void check(Context c) throws Exception {
+        String installed=c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionName;
+        Release release=latest(installed);
+        String tag=release.tag,asset=release.asset;
         String status=!asset.isEmpty()?"Dostępna aktualizacja "+tag:tag.isEmpty()?"Brak opublikowanych wydań.":"Masz aktualną wersję.";
         Mirror.prefs(c).edit().putString("appAsset",asset).putString("appUpdateStatus",status)
             .putLong("appUpdateChecked",System.currentTimeMillis()).apply();

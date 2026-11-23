@@ -32,7 +32,7 @@ public class RepoApp extends Application {
         });
     }
     String header(){
-        return "RepoKopia 1.11 • "+Reports.timestamp()+"\nAndroid "+Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+") • "+Build.MANUFACTURER+" "+Build.MODEL+"\n";
+        return "RepoKopia 1.12 • "+Reports.timestamp()+"\nAndroid "+Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+") • "+Build.MANUFACTURER+" "+Build.MODEL+"\n";
     }
     void event(String s){
         try{reports.event(s);}catch(IOException e){Log.w("RepoKopia","Zapis dziennika",e);}
