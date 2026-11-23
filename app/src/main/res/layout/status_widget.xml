@@ -1,0 +1,18 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center_vertical" android:padding="12dp"
+    android:background="@drawable/widget_background">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="RepoKopia" android:textColor="#B0DED1" android:textSize="13sp" android:textStyle="bold"/>
+    <TextView android:id="@+id/widget_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Stan synchronizacji" android:textColor="#FFFFFF" android:textSize="17sp" android:textStyle="bold"
+        android:maxLines="1" android:ellipsize="end"/>
+    <TextView android:id="@+id/widget_detail" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Kopie repozytoriów" android:textColor="#EBF5F1" android:textSize="13sp"
+        android:maxLines="2" android:ellipsize="end"/>
+    <ProgressBar android:id="@+id/widget_bar" style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent" android:layout_height="6dp" android:layout_marginTop="3dp"
+        android:progressTint="#99EBCB" android:indeterminateTint="#99EBCB" android:visibility="gone"/>
+    <TextView android:id="@+id/widget_note" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="#B0DED1" android:textSize="12sp" android:maxLines="1" android:ellipsize="end"/>
+</LinearLayout>
